@@ -15,12 +15,12 @@ This project is a **compiler** for the **RPAL** (Recursive Procedural Algorithmi
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/rpal-compiler.git
+    git clone https://github.com/yourusername/RPAL-Compiler.git
     ```
 
 2. Navigate to the project directory:
     ```bash
-    cd rpal-compiler
+    cd RPAL-Compiler
     ```
 
 3. Run the RPAL compiler:
