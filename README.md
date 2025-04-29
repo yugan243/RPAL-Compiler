@@ -42,7 +42,7 @@ This project is a **compiler** for the **RPAL** (Recursive Procedural Algorithmi
 
 ## Contributing
 
-Feel free to fork this project and create pull requests if you would like to contribute. Please ensure your code follows the project’s style guide.
+This is a course project for the Programming Languages module, developed by Yugan Nimsara and Pubudu Manoj. Only authorized collaborators are allowed to contribute to this repository. Please follow the code structure and guidelines defined in this project.
 
 ## License
 
