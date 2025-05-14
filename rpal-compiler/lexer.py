@@ -170,8 +170,13 @@ class LexicalAnalyzer:
                 continue
             
             if self.current_char == '-':
-                self.tokens.append(Token('-', None, self.line, self.column))
-                self.advance()
+                if self.peek() == '>':
+                    self.tokens.append(Token('->', None, self.line, self.column))
+                    self.advance()  # consume '-'
+                    self.advance()  # consume '>'
+                else:
+                    self.tokens.append(Token('-', None, self.line, self.column))
+                    self.advance()
                 continue
             
             if self.current_char == '*':
@@ -264,15 +269,9 @@ class LexicalAnalyzer:
                 self.advance()
                 continue
             
-            # Multi-character operators
-            if self.current_char == '-' and self.peek() == '>':
-                self.tokens.append(Token('->', None, self.line, self.column))
-                self.advance()  # consume '-'
-                self.advance()  # consume '>'
-                continue
-            
             # Unknown character
             raise Exception(f"Unknown character '{self.current_char}' at line {self.line}, column {self.column}")
+        
         # Add EOF token
         self.tokens.append(Token('EOF', None, self.line, self.column))
         return self.tokens
