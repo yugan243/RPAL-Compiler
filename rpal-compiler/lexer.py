@@ -129,3 +129,212 @@ class LexicalAnalyzer:
                 raise Exception(f"Unclosed string literal at line {self.line}, column {start_column}")
             self.advance()  # consume closing quote
         return Token('STR', string_str, self.line, start_column)
+    
+    def tokenize(self):
+        while self.current_char:
+            # Skip whitespace
+            if self.current_char.isspace():
+                self.skip_whitespace()
+                continue
+            # Skip comments
+            if self.current_char == '/' and self.peek() == '/':
+                self.advance()
+                self.advance()
+                self.skip_comment()
+                continue
+            # Skip multiline comments
+            if self.current_char == '/' and self.peek() == '*':
+                self.advance()
+                self.advance()
+                self.skip_multiline_comment()
+                continue
+            # Handle identifiers and keywords
+            if self.current_char.isalpha() or self.current_char == '_':
+                token = self.identifier()
+                self.tokens.append(token)
+                continue
+            # Handle integers
+            if self.current_char.isdigit():
+                token = self.read_integer()
+                self.tokens.append(token)
+                continue
+            # Handle floats
+            if self.current_char == '.':
+                token = self.read_float()
+                self.tokens.append(token)
+                continue
+            # Handle string literals
+            if self.current_char == '"':
+                token = self.read_string()
+                self.tokens.append(token)
+                continue
+            # Handle operators
+            if self.current_char == '+':
+                token = Token('PLUS', None, self.line, self.column)
+                self.tokens.append(token)
+                self.advance()
+                continue
+            if self.current_char == '-':
+                self.tokens.append(Token('-', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '*':
+                self.tokens.append(Token('*', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '/':
+                self.tokens.append(Token('/', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '=':
+                self.tokens.append(Token('=', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '(':
+                self.tokens.append(Token('(', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == ')':
+                self.tokens.append(Token(')', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == ';':
+                self.tokens.append(Token(';', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == ',':
+                self.tokens.append(Token(',', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '.':
+                self.tokens.append(Token('.', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == ':':
+                self.tokens.append(Token(':', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '&':
+                self.tokens.append(Token('&', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '@':
+                self.tokens.append(Token('@', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '|':
+                self.tokens.append(Token('|', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '\\':
+                self.tokens.append(Token('\\', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '[':
+                self.tokens.append(Token('[', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == ']':
+                self.tokens.append(Token(']', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '{':
+                self.tokens.append(Token('{', None, self.line, self.column))
+                self.advance()
+                continue
+            
+            if self.current_char == '}':
+                self.tokens.append(Token('}', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '!':
+                self.tokens.append(Token('!', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '<':
+                self.tokens.append(Token('<', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '>':
+                self.tokens.append(Token('>', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '?':
+                self.tokens.append(Token('?', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '^':
+                self.tokens.append(Token('^', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '%':
+                self.tokens.append(Token('%', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '~':
+                self.tokens.append(Token('~', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '#':
+                self.tokens.append(Token('#', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '$':
+                self.tokens.append(Token('$', None, self.line, self.column))
+                self.advance()
+                continue
+            if self.current_char == '\'':
+                self.tokens.append(Token('\'', None, self.line, self.column))
+                self.advance()
+                continue
+            # Multi-character operators
+            if self.current_char == '-' and self.peek() == '>':
+                self.tokens.append(Token('->', None, self.line, self.column))
+                self.advance()  # consume '-'
+                self.advance()  # consume '>'
+                continue
+            
+            # Unknown character
+            raise Exception(f"Unknown character '{self.current_char}' at line {self.line}, column {self.column}")
+        # Add EOF token
+        self.tokens.append(Token('EOF', None, self.line, self.column))
+        return self.tokens
+    
+    
+   
+    
+def tokenize_file(self):
+    with open(self.text, 'r') as file:
+        self.text = file.read()
+    lexer = LexicalAnalyzer(self.text)
+    return lexer.tokenize()
+
+    
+if __name__ == '__main__':
+    import sys
+    
+    if len(sys.argv) != 2:
+        print("Usage: python lexical_analyzer.py <filename>")
+        sys.exit(1)
+    
+    filename = sys.argv[1]
+    tokens = tokenize_file(filename)
+    
+    for token in tokens:
+        print(token)
