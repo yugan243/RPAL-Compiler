@@ -66,6 +66,66 @@ class LexicalAnalyzer:
         if self.current_char == None:
             raise Exception('Unterminated multiline comment')
         self.advance()
-        
 
-       
+
+    def identifier(self):
+        start_column = self.column
+        id_str = ''
+        while self.current_char and (self.current_char.isalnum() or self.current_char == '_'):
+              id_str += self.current_char
+              self.advance()
+        keywords = {
+            'let': 'let', 'in': 'in', 'fn': 'fn', 'where': 'where',
+            'aug': 'aug', 'or': 'or', 'not': 'not', 'gr': 'gr',
+            'ge': 'ge', 'ls': 'ls', 'le': 'le', 'eq': 'eq',
+            'ne': 'ne', 'true': 'true', 'false': 'false',
+            'nil': 'nil', 'dummy': 'dummy', 'rec': 'rec',
+            'within': 'within', 'and': 'and'
+        }
+        if id_str in keywords:
+            return Token(keywords[id_str], None, self.line, start_column)
+        else:
+            return Token('ID', id_str, self.line, start_column)
+        
+    def read_integer(self):
+        start_column = self.column
+        int_str = ''
+        while self.current_char and self.current_char.isdigit():
+            int_str += self.current_char
+            self.advance()
+        return Token('INT', int(int_str), self.line, start_column)
+    
+    def read_float(self):
+        start_column = self.column
+        float_str = ''
+        while self.current_char and (self.current_char.isdigit() or self.current_char == '.'):
+            float_str += self.current_char
+            self.advance()
+        return Token('FLOAT', float(float_str), self.line, start_column)
+    
+    #Read a string literal enclosed in double quotes
+    def read_string(self):
+        start_column = self.column
+        string_str = ''
+        self.advance()
+        while self.current_char and self.current_char != '"':
+            if self.current_char == '\\':
+                self.advance()
+                if self.current_char == 'n':
+                    string_str += '\n'
+                elif self.current_char == 't':
+                    string_str += '\t'
+                elif self.current_char == '"':
+                    string_str += '"'
+                elif self.current_char == '\\':
+                    string_str += '\\'
+                else:
+                    string_str += self.current_char
+            else:
+                string_str += self.current_char
+            self.advance()
+
+            if self.current_char != '"':
+                raise Exception(f"Unclosed string literal at line {self.line}, column {start_column}")
+            self.advance()  # consume closing quote
+        return Token('STR', string_str, self.line, start_column)
