@@ -127,8 +127,18 @@ class Parser:
         while self.current_token and self.current_token.type == '->':
             arrow_node = ASTNode('->')
             self.consume('->')
+            # Parse the "then" branch
+            then_branch = self.parse_tc()
             arrow_node.add_child(left)
-            arrow_node.add_child(self.parse_tc())
+            arrow_node.add_child(then_branch)
+            
+            # Check for the '|' (else branch)
+            if self.current_token and self.current_token.type == '|':
+                self.consume('|')
+                # Parse the "else" branch
+                else_branch = self.parse_tc()
+                arrow_node.add_child(else_branch)
+            
             left = arrow_node
         
         return left
@@ -412,7 +422,10 @@ class Parser:
             func_form.add_child(body)
             
             return func_form
-            
+        elif self.current_token and self.current_token.type == 'rec':
+        # Handle recursive definitions by delegating to parse_da
+            # self.consume('rec')
+            return self.parse_da()  
         else:
             # Simple variable definition: Vl = E
             vl_node = self.parse_vl()
