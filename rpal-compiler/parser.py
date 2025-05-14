@@ -56,46 +56,41 @@ class Parser:
             node = ASTNode('let')
             self.consume('let')
             
-            # Parse all definitions until 'in'
-            while True:
-                # Check for 'in' before trying to parse definition
-                if self.current_token.type == 'in':
-                    break
-                if self.current_token.type == 'where':
-                    break
-                node.add_child(self.parse_d())
-                
-                # Check for proper termination
-                if not self.current_token:
-                    raise Exception("Unexpected end of input in let expression")
-                    
-            # Handle where clause if present
-            if self.current_token.type == 'where':
-                self.consume('where')
-                where_node = ASTNode('where')
-                while self.current_token.type != 'in':
-                    where_node.add_child(self.parse_d())
-                node.add_child(where_node)
+            # Parse definition D
+            d_node = self.parse_d()
+            node.add_child(d_node)
             
             # Require 'in'
             if self.current_token.type != 'in':
-                found = self.current_token.type if self.current_token else "end of input"
-                raise Exception(
-                    f"Missing 'in' after definitions at line {self.current_token.line}\n"
-                    f"Found '{found}' instead\n"
-                    f"Current token: {self.current_token}\n"
-                    f"Previous tokens: {self.tokens[self.current_token_index-3:self.current_token_index]}"
-                )
+                self.error('in')
             self.consume('in')
-                
-            # Add variables to the lambda node
             
-            if self.current_token.type != '.':
-                self.error('.')
+            # Parse expression E
+            e_node = self.parse_e()
+            node.add_child(e_node)
+            
+            return node
+        
+        elif self.current_token.type == 'fn':
+            node = ASTNode('lambda')
+            self.consume('fn')
+            
+            # Parse variable bindings
+            while self.current_token.type != '.':
+                vb_node = self.parse_vb()
+                node.add_child(vb_node)
+                
+                if not self.current_token:
+                    self.error('.')
+            
             self.consume('.')
             
-            node.add_child(self.parse_e())
+            # Parse body expression
+            body_node = self.parse_e()
+            node.add_child(body_node)
+            
             return node
+        
         else:
             return self.parse_ew()
     
@@ -111,61 +106,17 @@ class Parser:
             return where_node
         
         return t_node
-    def parse_let(self):
-        node = ASTNode('let')
-        self.consume('let')
-        
-        # Parse definitions
-        definitions = []
-        while self.current_token and self.current_token.type not in ['in', 'where']:
-            definitions.append(self.parse_d())
-        node.add_child(ASTNode('definitions', children=definitions))
-        
-        # Handle where clause if present
-        if self.current_token and self.current_token.type == 'where':
-            self.consume('where')
-            where_defs = []
-            while self.current_token and self.current_token.type != 'in':
-                where_defs.append(self.parse_d())
-            node.add_child(ASTNode('where', children=where_defs))
-        
-        # Require 'in'
-        if not self.current_token or self.current_token.type != 'in':
-            found = self.current_token.type if self.current_token else "end of input"
-            raise Exception(
-                f"Missing 'in' after definitions at line {self.current_token.line}\n"
-                f"Found '{found}' instead\n"
-                f"All definitions must be complete before 'in'"
-            )
-        self.consume('in')
-        
-        # Parse main expression
-        node.add_child(self.parse_e())
-        return node
-
-    def parse_function_call(self):
-        func_name = self.current_token.value
-        self.consume('ID')
-        self.consume('(')
-        args = []
-        if self.current_token.type != ')':
-            args.append(self.parse_e())
-            while self.current_token.type == ',':
-                self.consume(',')
-                args.append(self.parse_e())
-        self.consume(')')
-        return ASTNode('call', [ASTNode('ID', func_name)] + args)
     
     # T -> Ta ( ',' Ta )*
     def parse_t(self):
         left = self.parse_ta()
         
         while self.current_token and self.current_token.type == ',':
-            comma_node = ASTNode('tau')
+            tau_node = ASTNode('tau')
             self.consume(',')
-            comma_node.add_child(left)
-            comma_node.add_child(self.parse_ta())
-            left = comma_node
+            tau_node.add_child(left)
+            tau_node.add_child(self.parse_ta())
+            left = tau_node
         
         return left
     
@@ -285,96 +236,93 @@ class Parser:
         
         return left
     
-    # Ap -> R [ '!' R ]*
+    # Ap -> R [ R ]*  (function application)
     def parse_ap(self):
         left = self.parse_r()
         
-        if self.current_token and self.current_token.type == '!':
-            bang_node = ASTNode('!')
-            self.consume('!')
-            bang_node.add_child(left)
-            bang_node.add_child(self.parse_r())
-            return bang_node
+        # Function application (only if there's another R term)
+        if self.current_token and self.current_token.type in ['(', 'ID', 'INT', 'STR', 'true', 'false', 'nil', 'dummy']:
+            # Check if it's a function application
+            if self._is_r_start():
+                gamma_node = ASTNode('gamma')
+                gamma_node.add_child(left)
+                gamma_node.add_child(self.parse_r())
+                return gamma_node
         
         return left
     
-    # R -> Rn | '(' E ')' | 'true' | 'false' | 'nil' | 'dummy' | INT | STR | ID | '(' E (',' E)+ ')'
+    def _is_r_start(self):
+        """Check if current token can start an R expression"""
+        if not self.current_token:
+            return False
+        return self.current_token.type in ['(', 'ID', 'INT', 'STR', 'true', 'false', 'nil', 'dummy']
+    
+    # R -> '(' E ')' | 'true' | 'false' | 'nil' | 'dummy' | INT | STR | ID
     def parse_r(self):
         if self.current_token.type == '(':
             self.consume('(')
+            
+            # Parse the expression inside parentheses
             expr = self.parse_e()
             
             # Check if it's a tuple
-            if self.current_token.type == ',':
+            if self.current_token and self.current_token.type == ',':
                 tuple_node = ASTNode('tau')
                 tuple_node.add_child(expr)
                 
-                while self.current_token.type == ',':
+                while self.current_token and self.current_token.type == ',':
                     self.consume(',')
                     tuple_node.add_child(self.parse_e())
                 
-                if self.current_token.type != ')':
+                if not self.current_token or self.current_token.type != ')':
                     self.error(')')
                 self.consume(')')
                 return tuple_node
             
-            if self.current_token.type != ')':
+            # Close the parentheses
+            if not self.current_token or self.current_token.type != ')':
                 self.error(')')
             self.consume(')')
             return expr
-        
+            
         elif self.current_token.type == 'true':
             node = ASTNode('true')
             self.consume('true')
             return node
-        
+            
         elif self.current_token.type == 'false':
             node = ASTNode('false')
             self.consume('false')
             return node
-        
+            
         elif self.current_token.type == 'nil':
             node = ASTNode('nil')
             self.consume('nil')
             return node
-        
+            
         elif self.current_token.type == 'dummy':
             node = ASTNode('dummy')
             self.consume('dummy')
             return node
-        
+            
         elif self.current_token.type == 'INT':
             node = ASTNode('INT', self.current_token.value)
             self.consume('INT')
             return node
-        
+            
         elif self.current_token.type == 'STR':
             node = ASTNode('STR', self.current_token.value)
             self.consume('STR')
             return node
-        
+            
         elif self.current_token.type == 'ID':
             node = ASTNode('ID', self.current_token.value)
             self.consume('ID')
             return node
-        
+            
         else:
-            return self.parse_rn()
-    
-    # Rn -> R Rn | epsilon
-    def parse_rn(self):
-        # Implementation for function application
-        # This is a simplification - actual implementation would be more complex
-        if self.current_token and self.current_token.type in ['ID', 'INT', 'STR', '(', 'true', 'false', 'nil', 'dummy']:
-            func = self.parse_r()
-            arg = self.parse_r()
-            gamma_node = ASTNode('gamma')
-            gamma_node.add_child(func)
-            gamma_node.add_child(arg)
-            return gamma_node
-        
-        self.error()
-    
+            self.error("R expression")
+            
     # D -> Da ( 'and' Da )*
     def parse_d(self):
         left = self.parse_da()
@@ -390,7 +338,7 @@ class Parser:
     
     # Da -> Dr | 'rec' Dr
     def parse_da(self):
-        if self.current_token.type == 'rec':
+        if self.current_token and self.current_token.type == 'rec':
             rec_node = ASTNode('rec')
             self.consume('rec')
             rec_node.add_child(self.parse_dr())
@@ -400,12 +348,12 @@ class Parser:
     
     # Dr -> 'let' D 'in' Dr | Db
     def parse_dr(self):
-        if self.current_token.type == 'let':
+        if self.current_token and self.current_token.type == 'let':
             let_node = ASTNode('let')
             self.consume('let')
             let_node.add_child(self.parse_d())
             
-            if self.current_token.type != 'in':
+            if not self.current_token or self.current_token.type != 'in':
                 self.error('in')
             self.consume('in')
             
@@ -416,61 +364,60 @@ class Parser:
     
     # Db -> Vl '=' E | '(' D ')' | ID '(' Vb+ ')' '=' E
     def parse_db(self):
-        if self.current_token.type == '(':
+        if self.current_token and self.current_token.type == '(':
             self.consume('(')
             d_node = self.parse_d()
             
-            if self.current_token.type != ')':
+            if not self.current_token or self.current_token.type != ')':
                 self.error(')')
             self.consume(')')
             
             return d_node
         
-        elif self.current_token.type == 'ID' and self.current_token_index + 1 < len(self.tokens) and self.tokens[self.current_token_index + 1].type == '(':
-            # Function definition
-            function_name = ASTNode('ID', self.current_token.value)
+        # Check for function definition: ID ( params ) = E
+        elif (self.current_token and self.current_token.type == 'ID' and 
+              self.current_token_index + 1 < len(self.tokens) and 
+              self.tokens[self.current_token_index + 1].type == '('):
+            
+            func_name = ASTNode('ID', self.current_token.value)
             self.consume('ID')
             self.consume('(')
             
             # Parse parameters
-            parameters = []
-            if self.current_token.type == 'ID':
-                parameters.append(ASTNode('ID', self.current_token.value))
-                self.consume('ID')
+            params = []
+            if self.current_token and self.current_token.type != ')':
+                params.append(self.parse_vb())
                 
-                while self.current_token.type == ',':
+                while self.current_token and self.current_token.type == ',':
                     self.consume(',')
-                    if self.current_token.type != 'ID':
-                        self.error('ID')
-                    parameters.append(ASTNode('ID', self.current_token.value))
-                    self.consume('ID')
+                    params.append(self.parse_vb())
             
-            if self.current_token.type != ')':
+            if not self.current_token or self.current_token.type != ')':
                 self.error(')')
             self.consume(')')
             
-            if self.current_token.type != '=':
+            if not self.current_token or self.current_token.type != '=':
                 self.error('=')
             self.consume('=')
             
-            function_body = self.parse_e()
+            body = self.parse_e()
             
-            # Build function form node
-            function_form = ASTNode('function_form')
-            function_form.add_child(function_name)
+            # Construct function form node
+            func_form = ASTNode('function_form')
+            func_form.add_child(func_name)
             
-            for param in parameters:
-                function_form.add_child(param)
+            for param in params:
+                func_form.add_child(param)
+                
+            func_form.add_child(body)
             
-            function_form.add_child(function_body)
+            return func_form
             
-            return function_form
-    
         else:
-            # Variable definition
+            # Simple variable definition: Vl = E
             vl_node = self.parse_vl()
             
-            if self.current_token.type != '=':
+            if not self.current_token or self.current_token.type != '=':
                 self.error('=')
             self.consume('=')
             
@@ -479,20 +426,19 @@ class Parser:
             equals_node.add_child(self.parse_e())
             
             return equals_node
-
     
     # Vl -> ID | '(' Vl ')'
     def parse_vl(self):
-        if self.current_token.type == 'ID':
+        if self.current_token and self.current_token.type == 'ID':
             id_node = ASTNode('ID', self.current_token.value)
             self.consume('ID')
             return id_node
         
-        elif self.current_token.type == '(':
+        elif self.current_token and self.current_token.type == '(':
             self.consume('(')
             vl_node = self.parse_vl()
             
-            if self.current_token.type != ')':
+            if not self.current_token or self.current_token.type != ')':
                 self.error(')')
             self.consume(')')
             
@@ -503,16 +449,16 @@ class Parser:
     
     # Vb -> ID | '(' Vb ')'
     def parse_vb(self):
-        if self.current_token.type == 'ID':
+        if self.current_token and self.current_token.type == 'ID':
             id_node = ASTNode('ID', self.current_token.value)
             self.consume('ID')
             return id_node
         
-        elif self.current_token.type == '(':
+        elif self.current_token and self.current_token.type == '(':
             self.consume('(')
             vb_node = self.parse_vb()
             
-            if self.current_token.type != ')':
+            if not self.current_token or self.current_token.type != ')':
                 self.error(')')
             self.consume(')')
             
@@ -523,7 +469,13 @@ class Parser:
     
     def parse(self):
         """Entry point for parsing"""
-        return self.parse_e()
+        ast = self.parse_e()
+        
+        # Ensure we've consumed all tokens except EOF
+        if self.current_token and self.current_token.type != 'EOF':
+            self.error("end of input")
+            
+        return ast
 
 
 def parse_file(filename):
