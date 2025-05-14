@@ -103,6 +103,50 @@ class Parser:
             return where_node
         
         return t_node
+    def parse_let(self):
+        node = ASTNode('let')
+        self.consume('let')
+        
+        # Parse definitions
+        definitions = []
+        while self.current_token and self.current_token.type not in ['in', 'where']:
+            definitions.append(self.parse_d())
+        node.add_child(ASTNode('definitions', children=definitions))
+        
+        # Handle where clause if present
+        if self.current_token and self.current_token.type == 'where':
+            self.consume('where')
+            where_defs = []
+            while self.current_token and self.current_token.type != 'in':
+                where_defs.append(self.parse_d())
+            node.add_child(ASTNode('where', children=where_defs))
+        
+        # Require 'in'
+        if not self.current_token or self.current_token.type != 'in':
+            found = self.current_token.type if self.current_token else "end of input"
+            raise Exception(
+                f"Missing 'in' after definitions at line {self.current_token.line}\n"
+                f"Found '{found}' instead\n"
+                f"All definitions must be complete before 'in'"
+            )
+        self.consume('in')
+        
+        # Parse main expression
+        node.add_child(self.parse_e())
+        return node
+
+    def parse_function_call(self):
+        func_name = self.current_token.value
+        self.consume('ID')
+        self.consume('(')
+        args = []
+        if self.current_token.type != ')':
+            args.append(self.parse_e())
+            while self.current_token.type == ',':
+                self.consume(',')
+                args.append(self.parse_e())
+        self.consume(')')
+        return ASTNode('call', [ASTNode('ID', func_name)] + args)
     
     # T -> Ta ( ',' Ta )*
     def parse_t(self):
