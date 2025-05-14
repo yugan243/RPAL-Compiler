@@ -16,7 +16,7 @@ class LexicalAnalyzer:
         self.text = text
         self.pos = 0
         self.line = 1
-        self.column = 1
+        self.column = 0
         self.tokens = []
         self.current_char = self.text[self.pos]
         self.current_token = None
@@ -34,8 +34,38 @@ class LexicalAnalyzer:
         else:
             self.current_char = self.text[self.pos]
             self.column += 1
+    
+    def peek(self,n=1):
+        peek_pos = self.position + n - 1
+        if peek_pos < len(self.input_text):
+            return self.input_text[peek_pos]
+        return None
+
+    def skip_whitespace(self):
+        while self.current_char  and self.current_char.isspace():
             if self.current_char == '\n':
                 self.line += 1
                 self.column = 0
-    
-    
+            self.advance()
+
+    def skip_comment(self):
+        while self.current_char and self.current_char != '\n':
+            self.advance()
+
+    def skip_multiline_comment(self):
+        while self.current_char and (self.current_char != '*' or self.peek() != '/'):
+            if self.current_char == '\n':
+                self.line += 1
+                self.column = 0
+            self.advance()
+        if self.current_char == '*':
+            self.advance()
+        if self.current_char == '/':
+            self.advance()
+        
+        if self.current_char == None:
+            raise Exception('Unterminated multiline comment')
+        self.advance()
+        
+
+       
