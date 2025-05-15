@@ -3,9 +3,11 @@ class ASTNode:
         self.type = type
         self.value = value
         self.children = []
+        self.no_of_children = 0  # Initialize number of children
     
     def add_child(self, node):
         self.children.append(node)
+        self.no_of_children += 1  # Increment child count
         return node
     
     def print_ast(self, prefix=""):
@@ -23,9 +25,13 @@ class ASTNode:
 
 class Parser:
     def __init__(self, tokens):
+        if not tokens:
+            raise Exception("No tokens provided to parser. Check your input file or lexer.")
         self.tokens = tokens
+        self.ast = []
+        self.string_ast = []
         self.current_token_index = 0
-        self.current_token = self.tokens[0] if tokens else None
+        self.current_token = self.tokens[0]
     
     def error(self, expected=None):
         token = self.current_token
@@ -35,13 +41,14 @@ class Parser:
             raise Exception(f"Unexpected token {token} at line {token.line}, column {token.column}")
     
     def consume(self, expected_type=None):
-        if expected_type and self.current_token.type != expected_type:
+        if expected_type and (not self.current_token or self.current_token.type != expected_type):
             self.error(expected_type)
         if self.current_token_index < len(self.tokens) - 1:
             self.current_token_index += 1
             self.current_token = self.tokens[self.current_token_index]
         else:
             self.current_token = None
+    
 
     def parse_e(self):
         if self.current_token and self.current_token.type == 'let':
@@ -194,6 +201,37 @@ class Parser:
             gamma_node.add_child(self.parse_r())
             return gamma_node
         return left
+    def convert_ast_to_string_ast(self):
+        dots = ""
+        stack = []
+
+        while self.ast:
+            if not stack:
+                if self.ast[-1].no_of_children == 0:
+                    self.add_strings(dots, self.ast.pop())
+                else:
+                    node = self.ast.pop()
+                    stack.append(node)
+            else:
+                if self.ast[-1].no_of_children > 0:
+                    node = self.ast.pop()
+                    stack.append(node)
+                    dots += "."
+                else:
+                    stack.append(self.ast.pop())
+                    dots += "."
+                    while stack[-1].no_of_children == 0:
+                        self.add_strings(dots, stack.pop())
+                        if not stack:
+                            break
+                        dots = dots[:-1]
+                        node = stack.pop()
+                        node.no_of_children -= 1
+                        stack.append(node)
+
+        # Reverse the list
+        self.string_ast.reverse()
+        return self.string_ast
     
     def _is_r_start(self):
         if not self.current_token:
